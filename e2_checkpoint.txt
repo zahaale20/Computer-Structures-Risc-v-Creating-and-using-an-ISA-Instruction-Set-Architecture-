@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "kernelspec": {
+      "name": "node_nteract",
+      "language": "javascript",
+      "display_name": "Node.js (nteract)"
+    },
+    "kernel_info": {
+      "name": "node_nteract"
+    },
+    "language_info": {
+      "name": "javascript",
+      "version": "8.2.1",
+      "mimetype": "application/javascript",
+      "file_extension": ".js"
+    },
+    "title": "WepSIM ",
+    "nteract": {
+      "version": "nteract-on-jupyter@2.0.0"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": "## mode",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "ep",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "mode",
+        "type": "string",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## firmware",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "begin {\n                    # ensure R0 is zero\n   (EXCODE = 0, T11, MR = 1, SelC = 0, LC = 1),\n\n    fetch:    \t\t\t# MAR <- PC\n                    # MBR <- Mem[MAR]\n                    # IR  <- MBR, PC <- PC + 4\n                    # jump to associated microcode for opcode\n                    \n                    (T2, C0),\n                    (TA, R, BW = 11, M1 = 1, C1 = 1),\n                    (M2, C2, T1, C3),\n                    (A0, B = 0, C = 0)\n}\n\nlui rd inm {\n# MAR ← PC\n# MBR ← MP[MAR]\n# PC ← PC + 4\n# RRE1 ← MBR \n\n   co = 010010,\n   nwords = 2,\n   rd = reg(25, 21),\n   inm = inm(63, 32),\n   help = 'R1 <- inm',\n   {\n      # Cycle 1\n      (T2, C0),\n        \n      # Cycle 2\n      (TA, R, BW = 11, SE = 0, M1 = 1, C1, M2 = 1, C2),\n        \n      # Cycle 3\n      (T1, MR = 0, SELC = 10101, LC, A0 = 1, B = 1, C = 0)\n   }\n}\n\n\nsw reg1 (reg2) {\n# MAR ← RI(RRE1)\n# MBR ← RRE2\n# MP[MAR] ← MBR\n\n   co = 010000,\n   nwords = 1,\n   reg1 = reg(25, 21),\n   reg2 = reg(20, 16),\n   help = 'mem(R2) <- mem(R1)',\n   {\n      # Cycle 1\n      (MR = 0, SELA = 10000, T9, C0),\n        \n      # Cycle 2\n      (MR = 0, SELA = 10101, T9, M1 = 0, C1),\n        \n      # Cycle 3\n      (TA, W, BW = 11, SE = 0, TD, A0 = 1, B = 1, C = 0)\n   }\n}\n\nlw reg1 (reg2) {\n# MAR ← RI(RRE2) \n# MBR ← MP[MAR] \n# RRE1 ← MBR \n\n   co = 010011,\n   nwords = 1,\n   reg1 = reg(25, 21),\n   reg2 = reg(20, 16),\n   help = 'mem(R1) <- mem(R2)',\n   {\n      # Cycle 1\n      (MR = 0, SELA = 10000, T9, C0),\n        \n      # Cycle 2\n      (TA, R, BW = 11, SE = 0, M1 = 1, C1),\n        \n      # Cycle 3\n      (T1, MR = 0,  SELC = 10101, LC , A0 = 1, B = 1, C = 0)\n   }\n}\n\nadd reg1 reg2 reg3 {\n# RRE3 ← RRE1 + RRE2\n\n   co = 011000,\n   nwords = 1,\n   reg1 = reg(25, 21),\n   reg2 = reg(20, 16),\n   reg3 = reg(15, 11),\n   help = 'R1 <- R2 + R3',\n   {\n      # Cycle 1\n      (MR = 0, MA = 0, MB = 0, MC = 1, SELA = 10000, SELB = 01011, SELCOP = 1010),\n      \n      # Cycle 2\n      (T6, SELC = 10101, LC, SELP = 11, M7 = 1, C7, A0 = 1, B = 1, C = 0)\n   }\n}\n\nmul_add reg1 reg2 reg3 reg4 {\n# RRE2 ← RRE2 * RRE3\n# RRE1 ← RRE2 + RRE4\n\n   co=011001,\n   nwords=1,\n   reg1=reg(25,21),\n   reg2=reg(20,16),\n   reg3=reg(15,11),\n   reg4=reg(10,6),\n   help='R1 <- R2 * R3 + R4',\n   {\n      # Cycle 1\n      (MR = 0, MA = 0, MB = 0, MC = 1, SELA = 10000, SELB = 01011, SELCOP = 1100),\n        \n      # Cycle 2  \n      (T6, C5),\n      \n      # Cycle 3\n      (MR = 0, MA = 0, MB = 01, MC = 1, SELA = 00110, SELCOP = 1010),\n        \n      # Cycle 4  \n      (T6, SELC = 10101, LC,  SELP = 11, M7 = 1, C7,  A0 = 1, B = 1, C = 0)\n   }\n}\n\nbeq rs1 rs2 offset {\n# RT2←SR\n# If RRE1 == RRE2 or RRE1 - RRE2 == 0\n# SR ← RT2\n# RT1 ← PC\n# RT2 ← IR(S10)\n# PC ← RT1 + RT2  \n\n   co=111111,\n   nwords=1,\n   rs1=reg(25,21),\n   rs2=reg(20,16),\n   offset=address(15,0)rel,\n   help='if (R1 == R2), pc = pc + offset',\n   {\n     # Cycle 1\n     (T8, C5),\n       \n     # Cycle 2\n     (MR = 0, MC = 1, SELA = 10101, SELB = 10000, SELCOP = 1011, SELP = 11, M7, C7),\n       \n     # Cycle 3\n     (A0 = 0, B = 1, C = 110, MADDR = bck2ftch),\n       \n     # Cycle 4\n     (T5, M7 = 0, C7),\n     \n     # Cycle 5\n     (T2, C4),\n       \n     # Cycle 6\n     (SE = 1, OFFSET = 0, SIZE = 10000, T3, C5),\n     \n     # Cycle 7\n     (MA = 1, MB = 1, MC =1 , SELCOP = 1010, T6),\n     \n     # Cycle 8\n     (C2, A0 = 1, B = 1, C = 0),\n     \n     # Cycle 9\n     bck2ftch: (T5, M7=0, C7),\n     \n     # Cycle 10\n     (A0 = 1, B = 1, C = 0)\n \t   }\n}\n\njal U16 {\n# RC ← PC\n# PC ← RI(U16) \n   co=100001,\n   nwords=1,\n   U16=inm(15,0),\n\n   help='PC <- PC += U16',\n   {\n      # Cycle 1\n     \t(T2, MR = 1, SELC = 00001, LC),\n      \n      # Cycle 2\n      (SIZE = 10000, OFFSET = 0, SE = 0, T3, M2 = 0, C2, A0 = 1, B = 1, C = 0)\n   }\n}\n\njr_ra {\n# PC ← RRE1 \n\n   co=100010,\n   nwords=1,\n   help='PC <- RA',\n   {\n     # Cycle 1\n     (MR = 1, SELA = 00001, M2 = 0, C2),\n     \n     # Cycle 2\n     (T9, A0 = 1, B = 1, C = 0)  \n   }\n}\n\nhalt {\n# PC ← RA/zero\n# SR ← RA/zero\n  \n   co=100011,\n   nwords=1,\n   help='halt',\n   {\n     # Cycle 1\n     (MR = 1, SELA = 00000, M2 = 0, C2, M7 = 0, C7, A0 = 1, B = 1, C = 0)  \n   }\n}\n\n\nxchb (reg1) (reg2) {\n# RT1 ← Memory[RRE1] Memory \n# [RRE1] ← Memory [RRE2] Memory \n# [RRE2] ← RT1\n\n   co=011010,\n   nwords=1,\n   reg1=reg(25,21),\n   reg2=reg(20,16),\n   help='xchb R1 R2',\n   {\n      # Cycle 1\n     \t(MR = 0, SELA = 10101, T9, C0),\n     \n      # Cycle 2\n     \t(TA, R, BW = 0, SE = 0, M1 = 1, C1, T1),\n    \n      # Cycle 3\n      (T1, C4),\n      \n      # Cycle 4\n      (MR = 0, SELA = 10000, T9, C0),\n        \n      # Cycle 5\n      (TA, R, BW = 0, SE = 0, M1 = 1, C1),\n      \n      # Cycle 6\n      (T1, C5),\n      \n      # Cycle 7\n      (T4, M1 = 0, C1),\n      \n      # Cycle 8\n      (TA, BW = 0, SE = 0, TD, W),\n        \n      # Cycle 9\n      (MR = 0, SELA = 10101, T9, C0),\n        \n      # Cycle 10\n      (T5, M1 = 0, C1),\n      \n      # Cycle 11\n      (TA, BW = 0, SE = 0, TD, W, A0 = 1, B = 1, C = 0)  \n   }\n}\n\n\nout reg val {\n   co = 111111,\n   nwords = 1,\n   reg = reg(25,21),\n   val = inm(15,0),\n   {\n     # Cycle 1\n     (SE = 0, OFFSET = 0, SIZE = 10000, T3 = 1, C0 = 1),\n       \n     # Cycle 2\n     (MR = 0, SELA = 10101, T9 = 1, M1 = 0, C1 = 1),\n       \n     # Cycle 3\n     (TA = 1, TD = 1, IOW = 1, BW = 11, SE = 0, A0 = 1, B = 1, C = 0)\n   }\n}\n\n\nregisters {\n0=(zero,  x0),\n1=(ra,    x1),\n2=(sp,    x2) (stack_pointer),\n3=(gp,    x3),\n4=(tp,    x4),\n5=(t0,    x5),\n6=(t1,    x6),\n7=(t2,    x7),\n8=(s0,    x8),\n9=(s1,    x9),\n10=(a0,  x10),\n11=(a1,  x11),\n12=(a2,  x12),\n13=(a3,  x13),\n14=(a4,  x14),\n15=(a5,  x15),\n16=(a6,  x16),\n17=(a7,  x17),\n18=(s2,  x18),\n19=(s3,  x19),\n20=(s4,  x20),\n21=(s5,  x21),\n22=(s6,  x22),\n23=(s7,  x23),\n24=(s8,  x24),\n25=(s9,  x25),\n26=(s10, x26),\n27=(s11, x27),\n28=(t3,  x28),\n29=(t4,  x29),\n30=(t5,  x30),\n31=(t6,  x31)\n}",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "firmware",
+        "type": "string",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## assembly",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": ".data\nmsg: .byte 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,1,0,1,0,1,1,1, 0,1,1,1,0,1,1,1, 0,1,0,1,0,0,0,0, 0,1,0,1,0,1,0,1, 0,1,0,1,0,1,0,1, 0,1,0,1,0,0,0,0, 0,1,1,1,0,1,1,1, 0,1,1,1,0,1,1,1, 0,1,1,1,0,0,0,0, 0,1,0,1,0,1,0,1, 0,1,0,0,0,1,0,0, 0,0,0,1,0,0,0,0, 0,1,0,1,0,1,0,1, 0,1,0,0,0,1,0,0, 0,1,1,1,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,1,0,1,0,1,1,1, 0,1,1,1,0,1,1,1, 0,0,0,0,0,0,0,0, 0,1,0,1,0,1,0,0, 0,1,0,1,0,1,0,1, 0,0,0,0,0,0,0,0, 0,1,1,1,0,1,1,1, 0,1,1,1,0,1,0,1, 0,0,0,0,0,0,0,0, 0,0,0,1,0,1,0,0, 0,1,0,1,0,1,1,0, 0,0,0,0,0,0,0,0, 0,1,1,1,0,1,1,1, 0,1,0,1,0,1,0,1, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,1,1,1,0,1,1,1, 0,1,1,1,0,1,1,1, 0,0,1,0,0,0,0,0, 0,0,0,1,0,1,0,1, 0,0,0,1,0,0,0,1, 0,0,1,0,0,0,0,0, 0,1,1,1,0,1,0,1, 0,1,1,1,0,1,1,1, 0,0,1,0,0,0,0,0, 0,1,0,0,0,1,0,1, 0,1,0,0,0,1,0,0, 0,0,0,0,0,0,0,0, 0,1,1,1,0,1,1,1, 0,1,1,1,0,1,1,1, 0,0,1,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0\n\n\n.text\n   main:\n   \t\t\t\t\t# print input matrix\n            # send address of msg to 0x3108 (data I/O register)\n            lui t5 msg # lui load in t5 the msg address\n            out t5 0x3108 # out send t5 value to 0x3108 I/O address\n\n            # send show command to 0x3104 (control I/O register)\n            lui t5 0x20 # 0x20 means “show image” command\n            out t5 0x3104 # out send t5 value to 0x3104 I/O address\n     \n     \t\t\t\t#Input Parameters\n            lui a0 msg # load original grid into a0\n            lui a1 24   # grid size --> 24 x 24\n            lui a3 1    # constant variable to be used in loop\n     \n     \t\t\t\t# Running the function demo\n      \t\t\tjal demo # run demo function\n     \n     \t\t\t\tbeq a0 a0 fin\n     \ndemo:\t\t\t\t# rotates image 90* --> image[i][j] turns into image[j][i] \n            lui a2 0     # iterator for grid\n            \n            # Conditional statement #1 to run loop until full matrix is covered\nwhile1:\t\t\tbeq a2 a1 end # run while t2 != t1\n      \t\t\tadd t6 a2 zero # load t6 into a2\n            \nwhile2:\t\t\tbeq t6 a1 check #if t6 == a1, go to check label\n\t\t\t\t\t\t\n\t\t\t\t\t\tbeq t6 t6 math\n    \nback:  \t\t\txchb (t4) (t5) # xchb instruction --> handles rotation ... turn image[i][j] to image[j][i]\n\t\t\t\t\t\t# print output matrix\n            # send address of msg to 0x3108 (data I/O register)\n            lui t5 msg # lui load in t5 the msg address\n            out t5 0x3108 # out send t5 value to 0x3108 I/O address\n\n            # send show command to 0x3104 (control I/O register)\n            lui t5 0x20 # 0x20 means “show image” command\n            out t5 0x3104 # out send t5 value to 0x3104 I/O address\n       \n      \t\t\tadd t6 t6 a3 # t6 <- t6 + a3\n      \t\t\tbeq a3 a3 while2 # acts like jump instruction\n            \ncheck: \t\t\tadd a2 a2 a3 # a2 <- a2 + a3\n      \t\t\tbeq a3 a3 while1 # acts like jump instruction\n            \nend:        jr_ra # return to main\n\n\t\t\t\t\t\t# Math to turn image[i][j] to image[j][i]\nmath:  \t\t\tmul_add t4 a2 a1 t6 # t4 = a2 * a1 + t6\n      \t\t\tmul_add t5 t6 a1 a2 # t5 = t6 * a1 + a2   \n      \t\t\tadd t4 t4 a0 # t4 += a0\n      \t\t\tadd t5 t5 a0 # t5 += a0\n            beq t5 t5 back\n\n\n     \t\t\t\t# Stopping the program\n fin:  \t\t\thalt # end program once demo is done running\n            \n\n\n\n\n\n\n\n\n\n\n",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "assembly",
+        "type": "string",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## state_current",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "{\n  \"time\": 1670194364689,\n  \"title\": \"clock 5512 @ &#181;address 1\",\n  \"title_short\": \"clock 5512,<br>&#181;add 1\",\n  \"content\": \"register R1 = 0x8034; register R2 = 0x100000; register R10 = 0x1000; register R11 = 0x18; register R12 = 0x1; register R13 = 0x1; register R29 = 0x1028; register R30 = 0x1181; register R31 = 0x10; register PC = 0x8050; memory 0x1018 = 0x1010100; memory 0x101c = 0x101; memory 0x1020 = 0x10101; memory 0x1024 = 0x1000001; memory 0x1028 = 0x1000100; memory 0x1030 = 0x1000000; memory 0x1034 = 0x1000100; memory 0x1038 = 0x1000100; memory 0x103c = 0x1000100; memory 0x1040 = 0x1000100; memory 0x1048 = 0x1010100; memory 0x104c = 0x1010100; memory 0x1050 = 0x1010100; memory 0x1054 = 0x1010100; memory 0x1058 = 0x1010100; memory 0x1060 = 0x1000000; memory 0x1064 = 0x1000100; memory 0x1068 = 0x100; memory 0x106c = 0x100; memory 0x1070 = 0x1000000; memory 0x1078 = 0x1000100; memory 0x107c = 0x1000100; memory 0x1080 = 0x100; memory 0x1084 = 0x100; memory 0x1088 = 0x1010100; memory 0x1090 = 0x100; memory 0x10a8 = 0x100; memory 0x10c0 = 0x1000000; memory 0x10c4 = 0x1010100; memory 0x10c8 = 0x1010100; memory 0x10cc = 0x1010100; memory 0x10d8 = 0x1000100; memory 0x10dc = 0x100; memory 0x10e0 = 0x1000100; memory 0x10e4 = 0x1000100; memory 0x10f0 = 0x1010100; memory 0x10f4 = 0x1010100; memory 0x10f8 = 0x1010100; memory 0x10fc = 0x1000100; memory 0x1108 = 0x1000100; memory 0x110c = 0x100; memory 0x1110 = 0x1000100; memory 0x1114 = 0x10100; memory 0x1120 = 0x1010000; memory 0x1124 = 0x1010100; memory 0x1128 = 0x1000100; memory 0x112c = 0x1000100; memory 0x1138 = 0x100; memory 0x1150 = 0x100; memory 0x1168 = 0x1010100; memory 0x116c = 0x1010100; memory 0x1170 = 0x1010100; memory 0x1174 = 0x1010100; memory 0x1178 = 0x10000; memory 0x1180 = 0x1000000; memory 0x1184 = 0x1000100; memory 0x1188 = 0x1000000; memory 0x118c = 0x1000000; memory 0x1190 = 0x10000; memory 0x1198 = 0x1010100; memory 0x119c = 0x1000100; memory 0x11a0 = 0x1010100; memory 0x11a4 = 0x1010100; memory 0x11a8 = 0x10000; memory 0x11b0 = 0x100; memory 0x11b4 = 0x1000100; memory 0x11b8 = 0x100; memory 0x11bc = 0x100; memory 0x11c8 = 0x1010100; memory 0x11cc = 0x1010100; memory 0x11d0 = 0x1010100; memory 0x11d4 = 0x1010100; memory 0x11d8 = 0x10000; memory 0x8000 = 0x4bc00000; memory 0x8004 = 0x1000; memory 0x8008 = 0x7c03108; memory 0x800c = 0x4bc00000; memory 0x8010 = 0x20; memory 0x8014 = 0x7c03104; memory 0x8018 = 0x49400000; memory 0x801c = 0x1000; memory 0x8020 = 0x49600000; memory 0x8024 = 0x18; memory 0x8028 = 0x49a00000; memory 0x802c = 0x1; memory 0x8030 = 0x84008038; memory 0x8034 = 0x14a005c; memory 0x8038 = 0x49800000; memory 0x8040 = 0x18b0038; memory 0x8044 = 0x63ec0000; memory 0x8048 = 0x3eb0028; memory 0x804c = 0x3ff0030; memory 0x8050 = 0x6bbe0000; memory 0x8054 = 0x4bc00000; memory 0x8058 = 0x1000; memory 0x805c = 0x7c03108; memory 0x8060 = 0x4bc00000; memory 0x8064 = 0x20; memory 0x8068 = 0x7c03104; memory 0x806c = 0x63ff6800; memory 0x8070 = 0x1adffd4; memory 0x8074 = 0x618c6800; memory 0x8078 = 0x1adffc4; memory 0x807c = 0x88000000; memory 0x8080 = 0x67ac5fc0; memory 0x8084 = 0x67df5b00; memory 0x8088 = 0x63bd5000; memory 0x808c = 0x63de5000; memory 0x8090 = 0x3deffbc; memory 0x8094 = 0x8c000000; \"\n}",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "state_current",
+        "type": "object",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## state_history",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "[]",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "state_history",
+        "type": "object",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## record",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "[]",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "record",
+        "type": "object",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## tag",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "12/4/2022, 11:52:38 PM",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "tag",
+        "type": "string",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": "## notify",
+      "metadata": {}
+    },
+    {
+      "cell_type": "code",
+      "source": "true",
+      "outputs": [],
+      "execution_count": 1,
+      "metadata": {
+        "name": "notify",
+        "type": "boolean",
+        "collapsed": false,
+        "deletable": false,
+        "editable": false
+      }
+    }
+  ]
+}

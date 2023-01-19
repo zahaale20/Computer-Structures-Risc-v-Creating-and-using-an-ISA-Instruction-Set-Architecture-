@@ -1,0 +1,268 @@
+lui rd inm {
+# MAR ← PC
+# MBR ← MP[MAR]
+# PC ← PC + 4
+# RRE1 ← MBR 
+
+   co = 010010,
+   nwords = 2,
+   rd = reg(25, 21),
+   inm = inm(63, 32),
+   help = 'R1 <- inm',
+   {
+      # Cycle 1
+      (T2, C0),
+        
+      # Cycle 2
+      (TA, R, BW = 11, SE = 0, M1 = 1, C1, M2 = 1, C2),
+        
+      # Cycle 3
+      (T1, MR = 0, SELC = 10101, LC, A0 = 1, B = 1, C = 0)
+   }
+}
+
+
+sw reg1 (reg2) {
+# MAR ← RI(RRE1)
+# MBR ← RRE2
+# MP[MAR] ← MBR
+
+   co = 010000,
+   nwords = 1,
+   reg1 = reg(25, 21),
+   reg2 = reg(20, 16),
+   help = 'mem(R2) <- mem(R1)',
+   {
+      # Cycle 1
+      (MR = 0, SELA = 10000, T9, C0),
+        
+      # Cycle 2
+      (MR = 0, SELA = 10101, T9, M1 = 0, C1),
+        
+      # Cycle 3
+      (TA, W, BW = 11, SE = 0, TD, A0 = 1, B = 1, C = 0)
+   }
+}
+
+lw reg1 (reg2) {
+# MAR ← RI(RRE2) 
+# MBR ← MP[MAR] 
+# RRE1 ← MBR 
+
+   co = 010011,
+   nwords = 1,
+   reg1 = reg(25, 21),
+   reg2 = reg(20, 16),
+   help = 'mem(R1) <- mem(R2)',
+   {
+      # Cycle 1
+      (MR = 0, SELA = 10000, T9, C0),
+        
+      # Cycle 2
+      (TA, R, BW = 11, SE = 0, M1 = 1, C1),
+        
+      # Cycle 3
+      (T1, MR = 0,  SELC = 10101, LC , A0 = 1, B = 1, C = 0)
+   }
+}
+
+add reg1 reg2 reg3 {
+# RRE3 ← RRE1 + RRE2
+
+   co = 011000,
+   nwords = 1,
+   reg1 = reg(25, 21),
+   reg2 = reg(20, 16),
+   reg3 = reg(15, 11),
+   help = 'R1 <- R2 + R3',
+   {
+      # Cycle 1
+      (MR = 0, MA = 0, MB = 0, MC = 1, SELA = 10000, SELB = 01011, SELCOP = 1010),
+      
+      # Cycle 2
+      (T6, SELC = 10101, LC, SELP = 11, M7 = 1, C7, A0 = 1, B = 1, C = 0)
+   }
+}
+
+mul_add reg1 reg2 reg3 reg4 {
+# RRE2 ← RRE2 * RRE3
+# RRE1 ← RRE2 + RRE4
+
+   co=011001,
+   nwords=1,
+   reg1=reg(25,21),
+   reg2=reg(20,16),
+   reg3=reg(15,11),
+   reg4=reg(10,6),
+   help='R1 <- R2 * R3 + R4',
+   {
+      # Cycle 1
+      (MR = 0, MA = 0, MB = 0, MC = 1, SELA = 10000, SELB = 01011, SELCOP = 1100),
+        
+      # Cycle 2  
+      (T6, C5),
+      
+      # Cycle 3
+      (MR = 0, MA = 0, MB = 01, MC = 1, SELA = 00110, SELCOP = 1010),
+        
+      # Cycle 4  
+      (T6, SELC = 10101, LC,  SELP = 11, M7 = 1, C7,  A0 = 1, B = 1, C = 0)
+   }
+}
+
+beq rs1 rs2 offset {
+# RT2←SR
+# If RRE1 == RRE2 or RRE1 - RRE2 == 0
+# SR ← RT2
+# RT1 ← PC
+# RT2 ← IR(S10)
+# PC ← RT1 + RT2  
+
+   co=111111,
+   nwords=1,
+   rs1=reg(25,21),
+   rs2=reg(20,16),
+   offset=address(15,0)rel,
+   help='if (R1 == R2), pc = pc + offset',
+   {
+     # Cycle 1
+     (T8, C5),
+       
+     # Cycle 2
+     (MR = 0, MC = 1, SELA = 10101, SELB = 10000, SELCOP = 1011, SELP = 11, M7, C7),
+       
+     # Cycle 3
+     (A0 = 0, B = 1, C = 110, MADDR = bck2ftch),
+       
+     # Cycle 4
+     (T5, M7 = 0, C7),
+     
+     # Cycle 5
+     (T2, C4),
+       
+     # Cycle 6
+     (SE = 1, OFFSET = 0, SIZE = 10000, T3, C5),
+     
+     # Cycle 7
+     (MA = 1, MB = 1, MC =1 , SELCOP = 1010, T6),
+     
+     # Cycle 8
+     (C2, A0 = 1, B = 1, C = 0),
+     
+     # Cycle 9
+     bck2ftch: (T5, M7=0, C7),
+     
+     # Cycle 10
+     (A0 = 1, B = 1, C = 0)
+ 	   }
+}
+
+jal U16 {
+# RC ← PC
+# PC ← RI(U16) 
+   co=100001,
+   nwords=1,
+   U16=inm(15,0),
+
+   help='PC <- PC += U16',
+   {
+      # Cycle 1
+     	(T2, MR = 1, SELC = 00001, LC),
+      
+      # Cycle 2
+      (SIZE = 10000, OFFSET = 0, SE = 0, T3, M2 = 0, C2, A0 = 1, B = 1, C = 0)
+   }
+}
+
+jr_ra {
+# PC ← RRE1 
+
+   co=100010,
+   nwords=1,
+   help='PC <- RA',
+   {
+     # Cycle 1
+     (MR = 1, SELA = 00001, M2 = 0, C2),
+     
+     # Cycle 2
+     (T9, A0 = 1, B = 1, C = 0)  
+   }
+}
+
+halt {
+# PC ← RA/zero
+# SR ← RA/zero
+  
+   co=100011,
+   nwords=1,
+   help='halt',
+   {
+     # Cycle 1
+     (MR = 1, SELA = 00000, M2 = 0, C2, M7 = 0, C7, A0 = 1, B = 1, C = 0)  
+   }
+}
+
+
+xchb (reg1) (reg2) {
+# RT1 ← Memory[RRE1] Memory 
+# [RRE1] ← Memory [RRE2] Memory 
+# [RRE2] ← RT1
+
+   co=011010,
+   nwords=1,
+   reg1=reg(25,21),
+   reg2=reg(20,16),
+   help='xchb R1 R2',
+   {
+      # Cycle 1
+     	(MR = 0, SELA = 10101, T9, C0),
+     
+      # Cycle 2
+     	(TA, R, BW = 0, SE = 0, M1 = 1, C1, T1),
+    
+      # Cycle 3
+      (T1, C4),
+      
+      # Cycle 4
+      (MR = 0, SELA = 10000, T9, C0),
+        
+      # Cycle 5
+      (TA, R, BW = 0, SE = 0, M1 = 1, C1),
+      
+      # Cycle 6
+      (T1, C5),
+      
+      # Cycle 7
+      (T4, M1 = 0, C1),
+      
+      # Cycle 8
+      (TA, BW = 0, SE = 0, TD, W),
+        
+      # Cycle 9
+      (MR = 0, SELA = 10101, T9, C0),
+        
+      # Cycle 10
+      (T5, M1 = 0, C1),
+      
+      # Cycle 11
+      (TA, BW = 0, SE = 0, TD, W, A0 = 1, B = 1, C = 0)  
+   }
+}
+
+
+out reg val {
+   co = 111111,
+   nwords = 1,
+   reg = reg(25,21),
+   val = inm(15,0),
+   {
+     # Cycle 1
+     (SE = 0, OFFSET = 0, SIZE = 10000, T3 = 1, C0 = 1),
+       
+     # Cycle 2
+     (MR = 0, SELA = 10101, T9 = 1, M1 = 0, C1 = 1),
+       
+     # Cycle 3
+     (TA = 1, TD = 1, IOW = 1, BW = 11, SE = 0, A0 = 1, B = 1, C = 0)
+   }
+}
